@@ -22,14 +22,12 @@ namespace TyporiGame
 
         [Tooltip("加速度")] public float SpeedChangeRate = 10.0f;
 
-        [Space(10)] [Tooltip("The height the player can jump")]
-        public float JumpHeight = 1.2f;
+        [Space(10)] [Tooltip("跳跃次数 -> 每次的跳跃高度")]
+        public float[] JumpHeight = new []{1.2f, 1};
 
-        [Tooltip("The character uses its own gravity value. The engine default is -9.81f")]
-        public float Gravity = -15.0f;
+        [Tooltip("角色自身重力，默认值-9.81f")] public float Gravity = -15.0f;
 
-        [Space(10)] [Tooltip("Time required to pass before being able to jump again. Set to 0f to instantly jump again")]
-        public float JumpTimeout = 0.50f;
+        [Space(10)] [Tooltip("重置跳跃的最小间隔")] public float JumpTimeout = 0.05f;
 
         [Tooltip("Time required to pass before entering the fall state. Useful for walking down stairs")]
         public float FallTimeout = 0.15f;
@@ -42,7 +40,7 @@ namespace TyporiGame
         [Tooltip("The radius of the grounded check. Should match the radius of the CharacterController")]
         public float GroundedRadius = 0.28f;
 
-        [Tooltip("What layers the character uses as ground")]
+        [Tooltip("地面检测Layer")]
         public LayerMask GroundLayers;
 
 
@@ -138,27 +136,27 @@ namespace TyporiGame
             Grounded = Physics.CheckSphere(spherePosition, GroundedRadius, GroundLayers, QueryTriggerInteraction.Ignore);
         }
 
+
+        // [Tooltip("可以跳跃的次数")] public int JumpCount = 2;
+        private int _currentJumpCount;
+
         /// <summary>
-        /// 这里面只计算了纵向加速度，最终的移动操作还是放在Move中一块进行了
+        /// 这里面只为计算纵向速度，最终的移动操作还是放在Move中一块进行了
         /// </summary>
         private void JumpAndGravity()
         {
             if (Grounded)
             {
-                // reset the fall timeout timer
+                //重制已跳跃次数，用重复跳跃时间稍微卡一下，防止因地面检测精度而刚起跳就重置跳跃次数
+                if (_currentJumpCount > 0 && _jumpTimeoutDelta <= 0.0f) _currentJumpCount = 0;
+
+                // 只是为了记录下落时间，以切换动画
                 _fallTimeoutDelta = FallTimeout;
 
                 // stop our velocity dropping infinitely when grounded
                 if (_verticalVelocity < 0.0f)
                 {
                     _verticalVelocity = -2f;
-                }
-
-                // Jump
-                if (_input.jump && _jumpTimeoutDelta <= 0.0f)
-                {
-                    // H * -2 * G的平方 = 达到目标高度所需的速度，由已知加速度算总路程的公式d=1/2(a(t^2))可以推出
-                    _verticalVelocity = Mathf.Sqrt(JumpHeight * -2f * Gravity);
                 }
 
                 // jump timeout
@@ -169,8 +167,8 @@ namespace TyporiGame
             }
             else
             {
-                // reset the jump timeout timer
-                _jumpTimeoutDelta = JumpTimeout;
+                //重制跳跃间隔，对于判定也很有用
+                // _jumpTimeoutDelta = JumpTimeout;
 
                 // 只是为了记录下落时间，以切换动画
                 if (_fallTimeoutDelta >= 0.0f)
@@ -182,15 +180,32 @@ namespace TyporiGame
                     // update animator if using character
                 }
 
-                //不在地面上，就要把跳跃设为关闭
-                _input.jump = false;
+                //不在地面上，就要把跳跃设为关闭 - 废弃，因为要二段跳
+                // _input.jump = false;
+            }
+
+            // 跳跃操作计算
+            if (JumpHeight.Length != 0)
+            {
+                // if (_currentJumpCount == JumpHeight.Length) _currentJumpCount = 0;
+                if (_input.jump && _currentJumpCount < JumpHeight.Length)
+                {
+                    // H * -2 * G的平方 = 达到目标高度所需的速度，由已知加速度算总路程的公式d=1/2(a(t^2))可以推出
+                    _verticalVelocity = Mathf.Sqrt(JumpHeight[_currentJumpCount] * -2f * Gravity);
+                    _currentJumpCount++;
+                    _input.jump = false;
+
+                    //重制跳跃间隔，对于判定也很有用
+                    _jumpTimeoutDelta = JumpTimeout;
+                    Debug.Log("_currentJumpCount = " + _currentJumpCount);
+                }
             }
 
             // apply gravity over time if under terminal (multiply by delta time twice to linearly speed up over time)
-            //纵向速度受重力影响，但设置了一个最大值。解释中的twice没懂
+            //纵向速度受重力影响，但设置了一个最大值。但解释中的twice没懂
             if (_verticalVelocity < _terminalVelocity)
             {
-                _verticalVelocity +=  Gravity * Time.deltaTime;
+                _verticalVelocity += Gravity * Time.deltaTime;
             }
         }
     }

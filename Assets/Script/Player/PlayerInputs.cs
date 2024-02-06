@@ -5,6 +5,9 @@ using UnityEngine.InputSystem;
 
 namespace TyporiGame
 {
+    /// <summary>
+    /// 进行玩家输入的操作，并在面板上显示出当前输入的各项参数
+    /// </summary>
     public class PlayerInputs : MonoBehaviour
     {
         [Header("Character Input Values")]
